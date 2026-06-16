@@ -1,79 +1,85 @@
+import os
+
 import cv2
 import mediapipe as mp
+import numpy as np
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 
-def main():
-    # Configure Hand Landmarker
-    model_path = 'hand_landmarker.task'
-    # Note: You need to download the model file from 
-    # https://developers.google.com/mediapipe/solutions/vision/hand_landmarker#models
-    
-    # For this example, if the model file is not present, we must inform the user
-    import os
-    if not os.path.exists(model_path):
-        print(f"Error: Model file '{model_path}' not found.")
-        print("Please download it from: https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task")
-        return
 
-    base_options = python.BaseOptions(model_asset_path=model_path)
-    options = vision.HandLandmarkerOptions(
-        base_options=base_options,
-        num_hands=2
-    )
-    
-    with vision.HandLandmarker.create_from_options(options) as landmarker:
-        # Initialize Webcam
+class HandTracker:
+
+    def __init__(self, model_path='hand_landmarker.task'):
+        if not os.path.exists(model_path):
+            raise FileNotFoundError(f"Model file '{model_path}' not found.")
+
+        base_options = python.BaseOptions(model_asset_path=model_path)
+        options = vision.HandLandmarkerOptions(
+            base_options=base_options,
+            num_hands=2,
+            running_mode=vision.RunningMode.IMAGE)
+        self.landmarker = vision.HandLandmarker.create_from_options(options)
+
+    def track(self):
+        """
+        Starts the webcam, displays the feed, and yields a numpy array of shape (N_HANDS, 21, 3).
+        The array contains (x, y, z) for each landmark.
+        Empty hands are filled with zeros to maintain fixed shape if desired, 
+        or we can yield only detected hands. 
+        To ensure a consistent shape (2, 21, 3), we'll pad with zeros.
+        """
         cap = cv2.VideoCapture(0)
-
         if not cap.isOpened():
-            print("Error: Could not open webcam.")
-            return
+            raise RuntimeError("Could not open webcam.")
 
-        print("Starting hand tracking (Tasks API)... Press 'q' to exit.")
+        try:
+            while cap.isOpened():
+                success, frame = cap.read()
+                if not success:
+                    continue
 
-        while cap.isOpened():
-            success, frame = cap.read()
-            if not success:
-                print("Ignoring empty camera frame.")
-                continue
+                # Flip for mirror view
+                frame = cv2.flip(frame, 1)
 
-            # Flip the frame horizontally for a later selfie-view display
-            frame = cv2.flip(frame, 1)
-            
-            # Convert the BGR image to RGB before processing.
-            # MediaPipe Tasks requires a mediapipe.Image object
-            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_frame)
-            
-            # Process the frame
-            results = landmarker.detect(mp_image)
+                # Convert to RGB for MediaPipe
+                rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                mp_image = mp.Image(image_format=mp.ImageFormat.SRGB,
+                                    data=rgb_frame)
 
-            # Draw hand landmarks
-            if results.hand_landmarks:
-                for hand_landmarks in results.hand_landmarks:
-                    # Draw landmarks manually or use drawing utils if available
-                    for landmark in hand_landmarks:
-                        # Convert normalized coordinates to pixel coordinates
-                        h, w, _ = frame.shape
-                        cx, cy = int(landmark.x * w), int(landmark.y * h)
-                        cv2.circle(frame, (cx, cy), 5, (0, 255, 0), -1)
-                        
-                        # Print wrist (index 0 is wrist)
-                        # We need to find the wrist index
-                    
-                    # Print wrist coordinates (landmark 0)
-                    wrist = hand_landmarks[0]
-                    print(f"Wrist coordinates: x={wrist.x:.2f}, y={wrist.y:.2f}")
+                results = self.landmarker.detect(mp_image)
 
-            # Display the resulting frame
-            cv2.imshow('Hand Tracking', frame)
-            
-            if cv2.waitKey(5) & 0xFF == ord('q'):
-                break
+                if results.hand_landmarks:
+                    # Prepare output array (2 hands, 21 landmarks, 3 coords (x,y,z))
+                    output_landmarks = np.zeros((2, 21, 3), dtype=np.float32)
 
-        cap.release()
-        cv2.destroyAllWindows()
+                    for i, hand_landmarks in enumerate(results.hand_landmarks):
+                        if i >= 2: break
+                        for j, landmark in enumerate(hand_landmarks):
+                            output_landmarks[i, j] = [
+                                landmark.x, landmark.y, landmark.z
+                            ]
 
-if __name__ == "__main__":
-    main()
+                            # Visualization
+                            h, w, _ = frame.shape
+                            cv2.circle(
+                                frame,
+                                (int(landmark.x * w), int(landmark.y * h)), 5,
+                                (0, 255, 0), -1)
+
+                    # Display the frame
+                    cv2.imshow('Hand Tracking', frame)
+                    if cv2.waitKey(5) & 0xFF == ord('q'):
+                        break
+
+                    yield output_landmarks
+                else:
+                    # Even if no hands, still display the feed so it doesn't freeze
+                    cv2.imshow('Hand Tracking', frame)
+                    if cv2.waitKey(5) & 0xFF == ord('q'):
+                        break
+        finally:
+            cap.release()
+            cv2.destroyAllWindows()
+
+    def close(self):
+        self.landmarker.close()
