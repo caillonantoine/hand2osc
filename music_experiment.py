@@ -9,6 +9,7 @@ import pandas as pd
 import numpy as np
 import tqdm
 
+import base64
 import os
 
 _REST_DURATION = flags.DEFINE_float("rest_duration",
@@ -23,6 +24,7 @@ _NAME = flags.DEFINE_string(
     required=True,
     help="Experiment name",
 )
+_MUSIC_DURATION = flags.DEFINE_int("music_duration", default=30, help="music duration")
 
 
 class DummyDevice:
@@ -82,7 +84,7 @@ def main(argv):
         stream_info = streams[index]
         lsl_device = pylsl.StreamInlet(stream_info)
 
-    audio_duration = 15
+    audio_duration = _MUSIC_DURATION.value
     num_audio_samples = audio_duration * 48000
     output_file = pathlib.Path(f"recordings/{_NAME.value}.csv")
     first_write = not output_file.exists()
@@ -104,6 +106,7 @@ def main(argv):
                 current_measures = []
                 while time.time() - start < audio_duration:
                     sample, timestamp = lsl_device.pull_sample(timeout=1.)
+                    sample = np.asarray(sample).astype(np.float32).tobytes()
                     pbar.update()
                     current_measures.append(
                         dict(sample=sample,
@@ -111,10 +114,15 @@ def main(argv):
                              repeat=repeat,
                              timestamp=timestamp), )
                 sd.wait()
-                pd.DataFrame(current_measures).to_csv(output_file,
-                                                      mode='a',
-                                                      header=first_write,
-                                                      index=False)
+                df = pd.DataFrame(current_measures)
+                df["sample"] = df["sample"].map(
+                    lambda x: base64.b64encode(x).decode())
+                df.to_csv(
+                    output_file,
+                    mode='a',
+                    header=first_write,
+                    index=False,
+                )
                 first_write = False
     except Exception as e:
         print("Something went wrong", e)
