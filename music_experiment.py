@@ -24,7 +24,7 @@ _NAME = flags.DEFINE_string(
     required=True,
     help="Experiment name",
 )
-_MUSIC_DURATION = flags.DEFINE_int("music_duration", default=30, help="music duration")
+_MUSIC_DURATION = flags.DEFINE_integer("music_duration", default=30, help="music duration")
 
 
 class DummyDevice:
