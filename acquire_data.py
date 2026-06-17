@@ -1,10 +1,14 @@
-import pylsl
 import pandas as pd
+import pylsl
 import tqdm
-from absl import flags, app
+from absl import app, flags
 
-
-_NAME = flags.DEFINE_string("name", default=None, help="Name of the recording", required=True,)
+_NAME = flags.DEFINE_string(
+    "name",
+    default=None,
+    help="Name of the recording",
+    required=True,
+)
 
 
 def main(argv):
@@ -12,7 +16,8 @@ def main(argv):
     streams = pylsl.resolve_streams()
 
     if not streams:
-        print("No EEG stream found. Make sure your LSL device is broadcasting.")
+        print(
+            "No EEG stream found. Make sure your LSL device is broadcasting.")
         exit()
 
     if len(streams) == 1:
@@ -38,5 +43,6 @@ def main(argv):
 
     pd.DataFrame(inputs).to_csv(_NAME.value + ".csv")
 
-if __name__ =="__main__":
+
+if __name__ == "__main__":
     app.run(main)
