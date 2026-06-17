@@ -7,10 +7,12 @@ from pythonosc import udp_client
 def main():
     pd = udp_client.SimpleUDPClient("localhost", 3000)
 
+    pd.send_message("/mrt2/model", ["/Users/acaillon/Documents/Magenta/magenta-rt-v2/models/mrt2_small/mrt2_small.mlxfn"])
+    pd.send_message("/mrt2/reset", [])
+    pd.send_message("/mrt2/buffersize", [16384])
 
-    
     print("Looking for an EEG stream...")
-    streams = pylsl.resolve_byprop('type', 'EEG')
+    streams = pylsl.resolve_byprop('name', 'feature')
 
     if not streams:
         print(
