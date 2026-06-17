@@ -26,14 +26,6 @@ _NAME = flags.DEFINE_string(
 )
 _MUSIC_DURATION = flags.DEFINE_integer("music_duration", default=30, help="music duration")
 
-
-class DummyDevice:
-
-    def pull_sample(self, *args, **kwargs):
-        time.sleep(.1)
-        return [1, 2, 3], 0.
-
-
 def apply_fade(audio, samplerate=48000, fade_duration=2):
     num_samples_fade = int(fade_duration * samplerate)
 
@@ -68,17 +60,16 @@ def main(argv):
 
     streams = pylsl.resolve_streams()
     if not streams:
-        print("Using dummy device")
-        time.sleep(1)
-        lsl_device = DummyDevice()
+        print("No LSL streams found")
+        exit(1)
 
     if len(streams) == 1:
         stream_info = streams[0]
         lsl_device = pylsl.StreamInlet(stream_info)
         print(stream_info)
     else:
-        for s in streams:
-            print(s)
+        for i, s in enumerate(streams):
+            print(f"{i}: {s.name()} ({s.type()})")
 
         index = int(input("select device: "))
         stream_info = streams[index]
@@ -105,14 +96,15 @@ def main(argv):
                 sd.play(audio, samplerate=48000)
                 current_measures = []
                 while time.time() - start < audio_duration:
-                    sample, timestamp = lsl_device.pull_sample(timeout=1.)
-                    sample = np.asarray(sample).astype(np.float32).tobytes()
-                    pbar.update()
-                    current_measures.append(
-                        dict(sample=sample,
-                             audio_path=audio_path,
-                             repeat=repeat,
-                             timestamp=timestamp), )
+                    samples, timestamps = lsl_device.pull_chunk(timeout=1.)
+                    for sample, timestamp in zip(samples, timestamps):
+                        sample_bytes = np.asarray(sample).astype(np.float32).tobytes()
+                        pbar.update()
+                        current_measures.append(
+                            dict(sample=sample_bytes,
+                                 audio_path=audio_path,
+                                 repeat=repeat,
+                                 timestamp=timestamp), )
                 sd.wait()
                 df = pd.DataFrame(current_measures)
                 df["sample"] = df["sample"].map(
