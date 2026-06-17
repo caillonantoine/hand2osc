@@ -5,6 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "absl-py>=2.4.0",
     "ai-edge-litert>=2.1.5",
     "flax>=0.12.7",
     "isort>=8.0.1",

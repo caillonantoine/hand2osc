@@ -14,15 +14,22 @@ def main():
     pd.send_message("/mrt2/buffersize", [16384])
 
     print("Looking for an EEG stream...")
-    streams = pylsl.resolve_byprop('name', 'feature')
+    streams = pylsl.resolve_streams()
 
     if not streams:
         print(
             "No EEG stream found. Make sure your LSL device is broadcasting.")
         return
 
-    # Create a new inlet to read from the stream
-    stream_info = streams[0]
+    if len(streams) == 1:
+        stream_info = streams[0]
+        print(stream_info)
+    else:
+        for s in streams:
+            print(s)
+        stream_index = int(input("select stream: "))
+        stream_info = streams[stream_index]
+
     print(f"Connecting to stream: {stream_info.name()}...")
     inlet = pylsl.StreamInlet(stream_info)
 

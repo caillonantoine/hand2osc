@@ -634,6 +634,7 @@ name = "gesture-to-embedding"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "absl-py" },
     { name = "ai-edge-litert" },
     { name = "flax" },
     { name = "isort" },
@@ -654,6 +655,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "absl-py", specifier = ">=2.4.0" },
     { name = "ai-edge-litert", specifier = ">=2.1.5" },
     { name = "flax", specifier = ">=0.12.7" },
     { name = "isort", specifier = ">=8.0.1" },
